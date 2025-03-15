@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JiNi Kipper</title>
+    <style>
+        body { 
+            position: relative; /* 위치 설정 */
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+
+        body::before {
+            content: ""; /* 가상 요소에 내용 넣기 */
+            position: absolute; /* 절대 위치 */
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: url('images/background.jpg'); /* 원하는 이미지 파일 경로로 변경 */
+            background-size: cover; /* 배경 이미지가 화면을 가득 채우도록 */
+            background-position: center; /* 배경 이미지가 화면의 중앙에 위치하도록 */
+            background-repeat: no-repeat; /* 배경 이미지가 반복되지 않도록 */
+            opacity: 0.5; /* 배경 이미지에 투명도 적용 */
+            z-index: -1; /* 가상 요소를 본문 내용 뒤에 배치 */
+        }
+
+        .grid { 
+            display: grid; 
+            gap: 10px; 
+            justify-content: center; 
+            margin: 20px; 
+            display: none; 
+        }
+
+        .grid img {
+            width: 100%;   
+            height: auto;  
+            object-fit: contain; 
+            max-width: 120px; 
+            cursor: pointer; 
+            border: 2px solid transparent;
+        }
+
+        .btn-container { margin-bottom: 20px; }
+        button { margin: 5px; padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; color: white; font-weight: bold; }
+        .btn-3 { background-color: #87CEEB; } /* 하늘색 */
+        .btn-mini { background-color: #FFB6C1; } /* 분홍색 */
+        .btn-grand { background-color: #90EE90; } /* 연두색 */
+        .btn-reset { background-color: #FFA500; display: none; } /* 주황색 */
+        input { padding: 10px; width: 80%; max-width: 300px; margin-bottom: 10px; }
+        #questionDisplay { font-size: 18px; margin-top: 20px; font-weight: bold; }
+        .footer { margin-top: 50px; font-size: 14px; color: gray; }
+
+        @media (orientation: landscape) {
+            .grid img {
+                max-width: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>JiNi Kipper</h1>
+
+    <input type="text" id="questionInput" placeholder="질문을 입력하세요.">
+    <div class="btn-container">
+        <button class="btn-3" onclick="shuffleAndDisplay('1x3')">3장</button>
+        <button class="btn-mini" onclick="shuffleAndDisplay('3x3')">미니타블로</button>
+        <button class="btn-grand" onclick="shuffleAndDisplay('4x9')">그랑타블로</button>
+    </div>
+
+    <div id="questionDisplay"></div>
+    <div id="cardContainer" class="grid"></div>
+
+    <!-- 그랑타블로로 돌아가기 버튼을 여기 배치 -->
+    <button id="resetButton" class="btn-reset" onclick="restoreOriginalGrid()">그랑타블로로 돌아가기</button>
+
+    <div class="footer">✨ 제작: 연유🌱</div>
+
+    <script>
+        const imagePaths = Array.from({length: 36}, (_, i) => `cards/${(i + 1).toString().padStart(2, '0')}.jpg`);
+        let displayedCards = []; 
+        let originalGrid = [];
+
+        function shuffleDeck() {
+            return imagePaths.sort(() => Math.random() - 0.5);
+        }
+
+        function displayCards(layout) {
+            const question = document.getElementById("questionInput").value.trim();
+            document.getElementById("questionDisplay").innerText = question ? `질문: ${question}` : "";
+
+            const container = document.getElementById("cardContainer");
+            container.innerHTML = "";
+            container.style.display = "grid";
+
+            let rows, cols;
+            if (layout === "1x3") { rows = 1; cols = 3; }
+            else if (layout === "3x3") { rows = 3; cols = 3; }
+            else if (layout === "4x9") { rows = 4; cols = 9; }
+
+            container.style.gridTemplateColumns = `repeat(${cols}, auto)`;
+            container.style.gridTemplateRows = `repeat(${rows}, auto)`;
+
+            displayedCards = shuffleDeck().slice(0, rows * cols);
+            originalGrid = [...displayedCards];
+
+            displayedCards.forEach((imgSrc, index) => {
+                const img = document.createElement("img");
+                img.src = imgSrc;
+                img.dataset.number = index + 1;
+                img.onclick = () => applyReverseChain(parseInt(img.dataset.number, 10));
+                container.appendChild(img);
+            });
+
+            document.getElementById("resetButton").style.display = "none"; // 초기에는 버튼 숨기기
+        }
+
+        function shuffleAndDisplay(layout) {
+            displayCards(layout);
+        }
+
+        function applyReverseChain(startIndex) {
+            if (displayedCards.length !== 36) {
+                alert("체인 기법은 4x9 배열에서만 가능합니다.");
+                return;
+            }
+
+            let chainResult = [];
+            let checkedNumbers = new Set();
+            let currentIndex = startIndex - 1; 
+
+            while (!checkedNumbers.has(currentIndex + 1)) {
+                checkedNumbers.add(currentIndex + 1);
+                let cardNumber = parseInt(displayedCards[currentIndex].match(/\d+/)[0], 10);
+                chainResult.push(cardNumber); // 순차적으로 추가 (push 사용)
+
+                if (checkedNumbers.has(cardNumber)) break;
+                currentIndex = cardNumber - 1;
+            }
+
+            chainResult.reverse();  // **체인이 끝난 후, 전체 배열을 반전**
+            displayChainResult(chainResult);
+        }
+
+        function displayChainResult(chainArray) {
+            const container = document.getElementById("cardContainer");
+            container.innerHTML = "";
+
+            // 체인 이미지가 최대 6개씩 나오도록 설정
+            let rows = Math.ceil(chainArray.length / 6);
+            container.style.gridTemplateColumns = "repeat(6, auto)";
+            container.style.gridTemplateRows = `repeat(${rows}, auto)`;
+
+            // 마지막 카드를 첫 번째로 배치하도록 순서를 바꿔서 배열
+            const lastCard = chainArray.pop();  // 마지막 카드를 분리
+            chainArray.unshift(lastCard); // 마지막 카드를 첫 번째에 추가
+
+            chainArray.forEach(cardNum => {
+                const img = document.createElement("img");
+                img.src = `cards/${cardNum.toString().padStart(2, '0')}.jpg`;
+                img.dataset.number = cardNum;
+                img.onclick = () => applyReverseChain(cardNum);
+                container.appendChild(img);
+            });
+
+            document.getElementById("resetButton").style.display = "inline-block"; // 체인 배열이 나오면 버튼 보이기
+        }
+
+        function restoreOriginalGrid() {
+            if (!originalGrid.length) return;
+
+            const container = document.getElementById("cardContainer");
+            container.innerHTML = "";
+            container.style.gridTemplateColumns = `repeat(9, auto)`;
+
+            originalGrid.forEach((imgSrc, index) => {
+                const img = document.createElement("img");
+                img.src = imgSrc;
+                img.dataset.number = index + 1;
+                img.onclick = () => applyReverseChain(parseInt(img.dataset.number, 10));
+                container.appendChild(img);
+            });
+
+            document.getElementById("resetButton").style.display = "none"; // 원래 배열로 돌아가면 버튼 숨기기
+        }
+    </script>
+
+</body>
+</html>
